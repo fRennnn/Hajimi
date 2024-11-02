@@ -34,6 +34,8 @@ Path path = Path({
 
 int idx_line = 0;
 int idx_char = 0;
+int loop = 0;
+Timer timer_waiting;
 std::string str_text;						//文本内容
 std::vector<std::string> str_line_list;		//行文本列表
 
@@ -148,7 +150,6 @@ void login_to_server(HWND hwnd) {
 	//数据同步线程
 	std::thread([&]() {
 		while (true) {
-			std::cout << id_player << "'s thread is working...\n";
 			using namespace std::chrono;
 
 			std::string route = (id_player == 1) ? "/update_1" : "/update_2";
@@ -158,14 +159,13 @@ void login_to_server(HWND hwnd) {
 			if (result && result->status == 200) {
 				int progress = std::stoi(result->body);
 				(id_player == 1) ? (progress_2 = progress) : (progress_1 = progress);
-			}
-			std::cout << "Progress 1: " << progress_1 << ", Progress 2: " << progress_2 << std::endl;
+			}		
 			std::this_thread::sleep_for(nanoseconds(1000000000 / 10)); //等待0.1秒后执行下一次同步循环
 		}
 		}).detach();
 }
 int main(int argc, char** argv) {
-
+	
 	// init
 	using namespace std::chrono;
 
@@ -191,6 +191,11 @@ int main(int argc, char** argv) {
 	player_1.set_position({ 842,842 });
 	player_2.set_position({ 842,842 });
 
+	timer_waiting.set_on_timeout([&]() {
+		++loop;
+		});
+	timer_waiting.set_one_shot(false);
+	timer_waiting.set_wait_time(0.5f);
 	timer_countdown.set_one_shot(false);
 	timer_countdown.set_wait_time(1.0f);
 	timer_countdown.set_on_timeout([&]() {
@@ -242,6 +247,7 @@ int main(int argc, char** argv) {
 		duration<float> delta = duration<float>(frame_start - last_tick);
 
 		if (stage == Stage::Waiting) {
+			timer_waiting.on_update(delta.count());
 			if (progress_1 >= 0 && progress_2 >= 0)
 				stage = Stage::Ready;
 		}
@@ -282,7 +288,23 @@ int main(int argc, char** argv) {
 
 		if (stage == Stage::Waiting) {
 			settextcolor(RGB(195, 195, 195));
-			outtextxy(15, 675, _T("比赛即将开始，等待其他玩家加入..."));
+			switch (loop)
+			{
+			case 0:outtextxy(15, 675, _T("比赛即将开始，等待其他玩家加入")); break;
+			case 1:outtextxy(15, 675, _T("比赛即将开始，等待其他玩家加入.")); break;
+			case 2:outtextxy(15, 675, _T("比赛即将开始，等待其他玩家加入..")); break;
+			case 3: {
+				outtextxy(15, 675, _T("比赛即将开始，等待其他玩家加入...")); 
+				break;
+			}
+			case 4: {
+				outtextxy(15, 675, _T("比赛即将开始，等待其他玩家加入")); 
+				loop = 0; 
+				break; 
+			}
+			default:
+				break;
+			}
 		}
 		else {
 			static const Rect rect_bg = {
